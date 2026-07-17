@@ -1,0 +1,179 @@
+/* Base resets */
+@font-face {
+  font-family: "Euclid";
+  src: url("./assets/fonts/EuclidCircularA-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Euclid";
+  src: url("./assets/fonts/EuclidCircularA-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Euclid";
+  src: url("./assets/fonts/EuclidCircularA-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+}
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #121212;
+}
+body{
+   font-family: "Euclid", sans-serif;
+}
+/* Custom Circular Photo Pins */
+.photo-marker {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 3px solid #00E676; /* Green indicator ring */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.photo-marker:hover {
+  transform: scale(1.15);
+}
+
+/* Float Alert at Top Center */
+.alert-banner {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #D32F2F;
+  color: white;
+  padding: 12px 20px;
+  border-radius: 30px;
+  font-weight: 600;
+  font-size: 14px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  z-index: 10;
+  white-space: nowrap;
+}
+.report-trigger-btn {
+  display: grid;
+  place-items: center;
+  justify-content: center;
+  background-color: #00E676;
+  color: #121212;
+  border: none;
+  padding: 0px 0px;
+  font-size: 16px;
+  font-weight: 400;
+  border-radius: 30px;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 230, 118, 0.4);
+  z-index: 10;
+
+  /* --- RESPONSIVE FIXES FOR INNER BUTTON --- */
+  white-space: wrap;          /* Prevents text from breaking awkwardly onto two lines */
+  max-width: 100%;
+}
+.report-trigger-btn-camera {
+  display: grid;
+  place-items: center;
+  justify-content: center;
+  background-color:rgba(253, 95, 83, 1);
+  color: #121212;
+  border: none;
+  padding: 10px 20px;
+  border: 3px solid white;
+  font-size: 16px;
+  font-weight: 400;
+  border-radius: 30px;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 230, 118, 0.4);
+  z-index: 10;
+
+  /* --- RESPONSIVE FIXES FOR INNER BUTTON --- */
+  white-space: wrap;          /* Prevents text from breaking awkwardly onto two lines */
+  max-width: 100%;
+}
+/* Float CTA Button at Bottom Center */
+.navBar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 50px;
+  background-color: rgb(217, 220, 222);
+  padding: 6px 16px;
+  
+  /* --- RESPONSIVE FIXES --- */
+  width: max-content;
+  max-width: calc(100% - 32px); /* Prevents the bar from touching or overflowing the screen edges */
+  box-sizing: border-box;       /* Ensures padding doesn't break the max-width calculation */
+}
+
+
+/* Mobile-friendly Slide-Up Sheet Panel */
+.slide-up-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #1E1E1E;
+  color: white;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  box-shadow: 0 -8px 24px rgba(0,0,0,0.4);
+  z-index: 20;
+  padding: 15px;
+  animation: slideUp 0.3s ease-out;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.panel-header h3 { margin: 0; font-size: 20px; }
+
+.close-btn {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.preview-img {
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  border-radius: 12px;
+  margin-top: 12px;
+}
+
+.camera-btn {
+  width: 100%;
+  padding: 14px;
+  background-color: #333;
+  color: white;
+  border: 1px solid #444;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
