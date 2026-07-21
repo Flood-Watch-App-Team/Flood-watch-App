@@ -5,7 +5,7 @@ interface TopHeaderProps {
   reportingStage: 'form' | 'adjust';
   setIsReporting: (val: boolean) => void;
   setCapturedImages: React.Dispatch<React.SetStateAction<string[]>>;
-  setCurrentTab: (tab: any) => void;
+  setCurrentTab: (tab: unknown) => void;
   setReportingStage: (stage: 'form' | 'adjust') => void;
   handleMainSearchSubmit: (e: React.FormEvent) => void;
   displayedLocation: string;

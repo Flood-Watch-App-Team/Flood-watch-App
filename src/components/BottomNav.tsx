@@ -1,9 +1,10 @@
 import React from 'react';
 
+
 interface BottomNavProps {
   currentTab: string;
   handleMapsTabClick: () => void;
-  setCurrentTab: (tab: any) => void;
+  setCurrentTab: (tab: unknown) => void;
   openReportingWorkflow: () => void;
   currentUser: string;
   getUserInitials: (name: string) => string;

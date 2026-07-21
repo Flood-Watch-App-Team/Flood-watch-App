@@ -1,4 +1,4 @@
-import { Color } from 'maplibre-gl';
+// import { Color } from 'maplibre-gl';
 import React, { useState } from 'react';
 
 interface MapControlsProps {
