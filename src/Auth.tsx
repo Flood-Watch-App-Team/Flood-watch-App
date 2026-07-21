@@ -1,44 +1,161 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface AuthProps {
   onAuthComplete: (username: string) => void;
 }
 
-type AuthStep = 'splash' | 'signin' | 'signup';
+type AuthStep = 'splash' | 'landing' | 'signin' | 'signup';
+type SignUpSubStep = 1 | 2 | 3 | 'otp';
 
 export default function Auth({ onAuthComplete }: AuthProps) {
   const [step, setStep] = useState<AuthStep>('splash');
+  const [signUpSubStep, setSignUpSubStep] = useState<SignUpSubStep>(1);
 
   // Sign In Form States
-  const [signInEmail, setSignInEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [signInPassword, setSignInPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // Sign Up Form States
-  const [fullName, setFullName] = useState('');
-  const [country, setCountry] = useState('Nigeria');
-  const [signUpEmail, setSignUpEmail] = useState('');
-  const [referralCode, setReferralCode] = useState('');
+  const [signUpUsername, setSignUpUsername] = useState('');
+  const [signUpPhone, setSignUpPhone] = useState('');
+  const [signUpPhoneError, setSignUpPhoneError] = useState('');
+  const [signUpPassword, setSignUpPassword] = useState('');
+  const [showSignUpPassword, setShowSignUpPassword] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
-  // Handle Login Completion
-  const handleSignInSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!signInEmail.trim()) {
-      alert('Please enter your email address.');
+  // OTP Verification State
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+
+  // Auto-transition from Splash to Landing Screen after 2 seconds
+  useEffect(() => {
+    if (step === 'splash') {
+      const timer = setTimeout(() => {
+        setStep('landing');
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [step]);
+
+  // Real-time phone input handler for Sign In
+  const handlePhoneInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value;
+
+    if (phoneError) setPhoneError('');
+
+    if (!val) {
+      setPhoneNumber('');
       return;
     }
-    const cleanUsername = signInEmail.split('@')[0].toLowerCase();
-    onAuthComplete(cleanUsername);
+
+    const hasPlus = val.startsWith('+');
+    val = val.replace(/[^0-9]/g, '');
+    if (hasPlus) val = '+' + val;
+
+    if (val.startsWith('+234')) {
+      if (val.length > 14) val = val.slice(0, 14);
+    } else if (val.startsWith('0')) {
+      if (val.length > 11) val = val.slice(0, 11);
+    } else if (val.startsWith('+')) {
+      if (!'+234'.startsWith(val)) return;
+    } else {
+      if (val.length > 10) val = val.slice(0, 10);
+    }
+
+    setPhoneNumber(val);
   };
 
-  // Handle Registration Completion
-  const handleSignUpSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fullName.trim() || !signUpEmail.trim()) {
-      alert('Please fill out all required fields.');
+  // Real-time phone input handler for Sign Up
+  const handleSignUpPhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value;
+
+    if (signUpPhoneError) setSignUpPhoneError('');
+
+    if (!val) {
+      setSignUpPhone('');
       return;
     }
-    const cleanUsername = fullName.trim().toLowerCase().replace(/\s+/g, '_');
-    onAuthComplete(cleanUsername);
+
+    const hasPlus = val.startsWith('+');
+    val = val.replace(/[^0-9]/g, '');
+    if (hasPlus) val = '+' + val;
+
+    if (val.startsWith('+234')) {
+      if (val.length > 14) val = val.slice(0, 14);
+    } else if (val.startsWith('0')) {
+      if (val.length > 11) val = val.slice(0, 11);
+    } else if (val.startsWith('+')) {
+      if (!'+234'.startsWith(val)) return;
+    } else {
+      if (val.length > 10) val = val.slice(0, 10);
+    }
+
+    setSignUpPhone(val);
+  };
+
+  // Format validation helper
+  const validatePhoneNumber = (val: string) => {
+    const clean = val.trim();
+    const ngFormat = /^0\d{10}$/;        
+    const intlFormat = /^\+234\d{10}$/;  
+    return ngFormat.test(clean) || intlFormat.test(clean);
+  };
+
+  // Active status checks
+  const isSignInActive = signInPassword.length >= 8;
+  const isStep1Valid = signUpUsername.trim().length > 0 && signUpPhone.length >= 10;
+  
+  // Password criteria check
+  const hasMinLength = signUpPassword.length >= 8;
+  const hasUppercase = /[A-Z]/.test(signUpPassword);
+  const hasNumber = /[0-9]/.test(signUpPassword);
+  const isStep2Valid = hasMinLength && hasUppercase && hasNumber;
+
+  // Mask Phone for OTP Screen
+  const maskedPhone = signUpPhone ? signUpPhone.slice(0, 6) + '****' + signUpPhone.slice(-2) : '+234 80****78';
+
+  // Handle Login Submission
+  const handleSignInSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validatePhoneNumber(phoneNumber)) {
+      setPhoneError('Please enter 10 digits after 0 or +234.');
+      return;
+    }
+    setPhoneError('');
+    const cleanUsername = phoneNumber.replace(/[^0-9]/g, '').slice(-10);
+    onAuthComplete(cleanUsername || 'user');
+  };
+
+  // Handle Step 1 Submission
+  const handleStep1Next = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validatePhoneNumber(signUpPhone)) {
+      setSignUpPhoneError('Please enter 10 digits after 0 or +234.');
+      return;
+    }
+    setSignUpPhoneError('');
+    setSignUpSubStep(2);
+  };
+
+  // Handle OTP digit changes
+  const handleOtpChange = (index: number, value: string) => {
+    if (value.length > 1) value = value.slice(-1);
+    const newOtp = [...otp];
+    newOtp[index] = value;
+    setOtp(newOtp);
+
+    // Auto focus next input box
+    if (value && index < 5) {
+      const nextInput = document.getElementById(`otp-input-${index + 1}`);
+      nextInput?.focus();
+    }
+  };
+
+  const handleVerifyOtp = () => {
+    const cleanUsername = signUpUsername.trim().toLowerCase().replace(/\s+/g, '_');
+    onAuthComplete(cleanUsername || 'user');
   };
 
   return (
@@ -48,66 +165,208 @@ export default function Auth({ onAuthComplete }: AuthProps) {
       display: 'flex', 
       alignItems: 'center', 
       justifyContent: 'center', 
-      backgroundColor: '#194c8b',
+      backgroundColor: '#091b29',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
     }}>
-      <div style={{ width: '100%', maxWidth: '402px', padding: '24px', boxSizing: 'border-box' }}>
+      {/* Dynamic Keyframe Animations */}
+      <style>{`
+        @keyframes eyeballWobbleLeft {
+          0%, 100% { transform: translate(0px, 0px); }
+          25% { transform: translate(-2px, -1.5px); }
+          50% { transform: translate(2px, 1.5px); }
+          75% { transform: translate(-1.5px, 2px); }
+        }
 
-        {/* ----------------- 1. SPLASH SCREEN FLOW ----------------- */}
+        @keyframes eyeballWobbleRight {
+          0%, 100% { transform: translate(0px, 0px); }
+          25% { transform: translate(2px, -1.5px); }
+          50% { transform: translate(-2px, 1.5px); }
+          75% { transform: translate(1.5px, 2px); }
+        }
+
+        .eyeball-dot-left {
+          animation: eyeballWobbleLeft 0.8s ease-in-out infinite;
+        }
+
+        .eyeball-dot-right {
+          animation: eyeballWobbleRight 0.8s ease-in-out infinite;
+        }
+      `}</style>
+
+      <div style={{ 
+        width: '100%', 
+        maxWidth: '402px', 
+        height: '100%',
+        maxHeight: '874px',
+        backgroundColor: '#FFFFFF',
+        borderRadius: '24px',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.45)',
+        position: 'relative'
+      }}>
+
+        {/* Header Bar */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          padding: '12px 24px 0 24px',
+          fontSize: '14px',
+          fontWeight: '600',
+          color: step === 'splash' ? '#FFFFFF' : '#111827',
+          backgroundColor: step === 'splash' ? '#091b29' : '#FFFFFF',
+          transition: 'all 0.3s ease'
+        }}>
+          <span>9:41</span>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <svg width="16" height="10" viewBox="0 0 16 10" fill="currentColor">
+              <path d="M0 8h3V10H0V8zm4-3h3v5H4V5zm4-3h3v8H8V2zm4-2h3v10h-3V0z"/>
+            </svg>
+            <svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor">
+              <path d="M7.5 0C3.4 0 0 2.5 0 5.5c0 1.8 1.3 3.4 3.3 4.4L2.5 11l2.8-1.5c.7.2 1.4.3 2.2.3 4.1 0 7.5-2.5 7.5-5.5S11.6 0 7.5 0z"/>
+            </svg>
+          </div>
+        </div>
+
+        {/* ----------------- 1. SPLASH SCREEN ----------------- */}
         {step === 'splash' && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', height: '100%', justifyContent: 'center' }}>
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            flex: 1,
+            backgroundColor: '#091b29'
+          }}>
             <div style={{
+              position: 'relative',
               width: '80px',
               height: '80px',
-              borderRadius: '20px',
-              backgroundColor: '#003366',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              marginBottom: '20px',
-              boxShadow: '0 10px 25px rgba(0, 51, 102, 0.2)'
+              marginBottom: '16px'
             }}>
-                <img src="/src/assets/Floodwatchlogo.svg" alt="" width={24} height={24}color='white'  />
-        
-            
+              <div style={{
+                width: '100%',
+                height: '100%',
+                backgroundColor: '#FFFFFF',
+                WebkitMaskImage: `url(/src/assets/Floodwatchlogo.svg)`,
+                maskImage: `url(/src/assets/Floodwatchlogo.svg)`,
+                WebkitMaskSize: 'contain',
+                maskSize: 'contain',
+                WebkitMaskRepeat: 'no-repeat',
+                maskRepeat: 'no-repeat',
+                WebkitMaskPosition: 'center',
+                maskPosition: 'center',
+              }} />
+
+              <div className="eyeball-dot-left" style={{
+                position: 'absolute',
+                top: '44%',
+                left: '35%',
+                width: '7px',
+                height: '7px',
+                borderRadius: '50%',
+                backgroundColor: '#091b29',
+                pointerEvents: 'none'
+              }} />
+
+              <div className="eyeball-dot-right" style={{
+                position: 'absolute',
+                top: '44%',
+                right: '35%',
+                width: '7px',
+                height: '7px',
+                borderRadius: '50%',
+                backgroundColor: '#091b29',
+                pointerEvents: 'none'
+              }} />
             </div>
-            
-            <h1 style={{ fontSize: '32px', fontWeight: 'bold', color: '#111827', margin: '0 0 8px 0' }}>
-              FloodWatch
+
+            <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#FFFFFF', margin: 0 }}>
+              Flood-watch
             </h1>
-            <p style={{ fontSize: '15px', color: '#6B7280', marginBottom: '40px', lineHeight: '1.5' }}>
-              Real-time flood detection, alert reporting & community safety mapping.
+          </div>
+        )}
+
+        {/* ----------------- 2. LANDING PAGE ----------------- */}
+        {step === 'landing' && (
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            textAlign: 'center', 
+            backgroundColor: '#FFFFFF',
+            padding: '32px 24px',
+            flex: 1,
+            justifyContent: 'center'
+          }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '16px',
+              backgroundColor: '#091b29',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '24px'
+            }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                backgroundColor: '#FFFFFF',
+                WebkitMaskImage: `url(/src/assets/Floodwatchlogo.svg)`,
+                maskImage: `url(/src/assets/Floodwatchlogo.svg)`,
+                WebkitMaskSize: 'contain',
+                maskSize: 'contain',
+                WebkitMaskRepeat: 'no-repeat',
+                maskRepeat: 'no-repeat',
+                WebkitMaskPosition: 'center',
+                maskPosition: 'center',
+              }} />
+            </div>
+
+            <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#111827', margin: '0 0 12px 0' }}>
+              Welcome to FloodWatch
+            </h1>
+            <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '36px', lineHeight: '1.5' }}>
+              Stay ahead of urban flooding. Receive live community alerts and report road conditions instantly.
             </p>
 
             <button 
               onClick={() => setStep('signin')}
               style={{
                 width: '100%',
-                padding: '14px',
-                borderRadius: '12px',
-                backgroundColor: '#003366',
+                padding: '16px',
+                borderRadius: '28px',
+                backgroundColor: '#091b29',
                 color: '#FFFFFF',
                 border: 'none',
                 fontWeight: '600',
-                fontSize: '16px',
+                fontSize: '15px',
                 cursor: 'pointer',
                 marginBottom: '12px'
               }}
             >
-              Get Started
+              Sign In
             </button>
 
             <button 
-              onClick={() => setStep('signup')}
+              onClick={() => {
+                setStep('signup');
+                setSignUpSubStep(1);
+              }}
               style={{
                 width: '100%',
-                padding: '14px',
-                borderRadius: '12px',
+                padding: '16px',
+                borderRadius: '28px',
                 backgroundColor: '#F3F4F6',
                 color: '#374151',
                 border: 'none',
                 fontWeight: '600',
-                fontSize: '16px',
+                fontSize: '15px',
                 cursor: 'pointer'
               }}
             >
@@ -116,221 +375,706 @@ export default function Auth({ onAuthComplete }: AuthProps) {
           </div>
         )}
 
-        {/* ----------------- 2. SIGN IN PAGE FLOW ----------------- */}
+        {/* ----------------- 3. SIGN IN SCREEN ----------------- */}
         {step === 'signin' && (
-          <div>
-            <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#111827', margin: '0 0 8px 0' }}>
-              Welcome back
-            </h2>
-            <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '24px' }}>
-              Sign in to view flood alerts in your area.
-            </p>
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            flex: 1, 
+            padding: '32px 28px',
+            backgroundColor: '#FFFFFF',
+            justifyContent: 'space-between'
+          }}>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '24px', marginTop: '12px' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  backgroundColor: '#091b29',
+                  WebkitMaskImage: `url(/src/assets/Floodwatchlogo.svg)`,
+                  maskImage: `url(/src/assets/Floodwatchlogo.svg)`,
+                  WebkitMaskSize: 'contain',
+                  maskSize: 'contain',
+                  WebkitMaskRepeat: 'no-repeat',
+                  maskRepeat: 'no-repeat',
+                  WebkitMaskPosition: 'center',
+                  maskPosition: 'center',
+                }} />
+              </div>
 
-            <button 
-              type="button"
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: '12px',
-                border: '1px solid #E5E7EB',
-                backgroundColor: '#FFFFFF',
-                fontWeight: '600',
-                color: '#374151',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                marginBottom: '20px'
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-              </svg>
-              Continue with Google
-            </button>
+              <h1 style={{ 
+                fontSize: '24px', 
+                fontWeight: '700', 
+                color: '#111827', 
+                textAlign: 'left', 
+                marginBottom: '28px',
+                letterSpacing: '-0.2px'
+              }}>
+                Welcome back!
+              </h1>
 
-            <div style={{ display: 'flex', alignItems: 'center', margin: '20px 0', color: '#9CA3AF' }}>
-              <div style={{ flex: 1, height: '1px', backgroundColor: '#E5E7EB' }}></div>
-              <span style={{ padding: '0 12px', fontSize: '13px' }}>or sign in with email</span>
-              <div style={{ flex: 1, height: '1px', backgroundColor: '#E5E7EB' }}></div>
+              <form onSubmit={handleSignInSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', color: '#6B7280', marginBottom: '8px', fontWeight: '500' }}>
+                    Phone number
+                  </label>
+                  <input 
+                    type="tel" 
+                    value={phoneNumber}
+                    onChange={handlePhoneInputChange}
+                    placeholder="+234 801 234 5678" 
+                    required
+                    style={{ 
+                      width: '100%', 
+                      padding: '14px 16px', 
+                      borderRadius: '12px', 
+                      border: phoneError ? '1px solid #EF4444' : '1px solid #E5E7EB', 
+                      backgroundColor: '#FAFAFA',
+                      fontSize: '15px',
+                      color: '#111827',
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  {phoneError && (
+                    <span style={{ fontSize: '12px', color: '#EF4444', marginTop: '6px', display: 'block' }}>
+                      {phoneError}
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', color: '#6B7280', marginBottom: '8px', fontWeight: '500' }}>
+                    Password
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input 
+                      type={showPassword ? 'text' : 'password'} 
+                      value={signInPassword}
+                      onChange={(e) => setSignInPassword(e.target.value)}
+                      placeholder="Enter your password" 
+                      required
+                      style={{ 
+                        width: '100%', 
+                        padding: '14px 44px 14px 16px', 
+                        borderRadius: '12px', 
+                        border: '1px solid #E5E7EB', 
+                        backgroundColor: '#FAFAFA',
+                        fontSize: '15px',
+                        color: '#111827',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={{
+                        position: 'absolute',
+                        right: '14px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#9CA3AF',
+                        padding: 0,
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'right', marginTop: '-4px' }}>
+                  <a href="#forgot" style={{ fontSize: '13px', color: '#6B7280', textDecoration: 'none', fontWeight: '500' }}>
+                    Forgot password?
+                  </a>
+                </div>
+
+                <button 
+                  type="submit"
+                  disabled={!isSignInActive}
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    borderRadius: '28px',
+                    backgroundColor: isSignInActive ? '#091b29' : '#6C8395',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    fontWeight: '600',
+                    fontSize: '15px',
+                    cursor: isSignInActive ? 'pointer' : 'not-allowed',
+                    marginTop: '24px',
+                    transition: 'background-color 0.25s ease, cursor 0.25s ease'
+                  }}
+                >
+                  Sign in
+                </button>
+              </form>
             </div>
 
-            <form onSubmit={handleSignInSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Email Address</label>
-                <input 
-                  type="email" 
-                  placeholder="Email address" 
-                  required
-                  value={signInEmail}
-                  onChange={(e) => setSignInEmail(e.target.value)}
-                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #E5E7EB', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Password</label>
-                <input 
-                  type="password" 
-                  placeholder="Password" 
-                  required
-                  value={signInPassword}
-                  onChange={(e) => setSignInPassword(e.target.value)}
-                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #E5E7EB', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <button 
-                type="submit"
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  borderRadius: '12px',
-                  backgroundColor: '#003366',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  fontWeight: '600',
-                  fontSize: '16px',
-                  cursor: 'pointer',
-                  marginTop: '12px'
-                }}
-              >
-                Sign In
-              </button>
-            </form>
-
-            <p style={{ textAlign: 'center', fontSize: '14px', color: '#6B7280', marginTop: '24px' }}>
+            <p style={{ textAlign: 'center', fontSize: '13px', color: '#6B7280', margin: '24px 0 12px 0' }}>
               Don't have an account?{' '}
               <span 
-                onClick={() => setStep('signup')}
-                style={{ color: '#003366', fontWeight: '600', cursor: 'pointer' }}
+                onClick={() => {
+                  setStep('signup');
+                  setSignUpSubStep(1);
+                }}
+                style={{ color: '#111827', fontWeight: '700', cursor: 'pointer' }}
               >
-                Sign Up
+                Create Account
               </span>
             </p>
           </div>
         )}
 
-        {/* ----------------- 3. CREATE ACCOUNT PAGES FLOW ----------------- */}
+        {/* ----------------- 4. PROGRESSIVE CREATE ACCOUNT FLOW (FIGMA EXACT MATCH) ----------------- */}
         {step === 'signup' && (
-          <div>
-            <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#111827', margin: '0 0 24px 0' }}>
-              Create your Account
-            </h2>
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            flex: 1, 
+            padding: '16px 24px 24px 24px',
+            backgroundColor: '#FFFFFF',
+            justifyContent: 'space-between',
+            overflowY: 'auto'
+          }}>
+            <div>
+              {/* Top Navigation & Step Indicator Header */}
+              {signUpSubStep !== 'otp' && (
+                <div style={{ position: 'relative', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (signUpSubStep === 1) setStep('landing');
+                        else if (signUpSubStep === 2) setSignUpSubStep(1);
+                        else if (signUpSubStep === 3) setSignUpSubStep(2);
+                      }}
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        backgroundColor: '#F3F4F6',
+                        border: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        color: '#374151'
+                      }}
+                    >
+                      ‹
+                    </button>
+                    <h2 style={{ fontSize: '16px', fontWeight: '600', color: '#111827', margin: 0 }}>
+                      Create your Account
+                    </h2>
+                  </div>
 
-            <button 
-              type="button"
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: '12px',
-                border: '1px solid #E5E7EB',
-                backgroundColor: '#FFFFFF',
-                fontWeight: '600',
-                color: '#374151',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                marginBottom: '24px'
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-              </svg>
-              Continue with Google
-            </button>
+                  {/* Progress Bar & Text Counter */}
+                  
+                </div>
+              )}
 
-            <div style={{ display: 'flex', alignItems: 'center', margin: '20px 0', color: '#9CA3AF' }}>
-              <div style={{ flex: 1, height: '1px', backgroundColor: '#E5E7EB' }}></div>
-              <span style={{ padding: '0 12px', fontSize: '13px' }}>Sign up with email</span>
-              <div style={{ flex: 1, height: '1px', backgroundColor: '#E5E7EB' }}></div>
+              {/* ---------------- STEP 1 (1 of 3): Personal Information ---------------- */}
+              {signUpSubStep === 1 && (
+                <div>
+                  {/* Icon Avatar */}
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+                    <div style={{
+                      width: '56px',
+                      height: '56px',
+                      borderRadius: '50%',
+                      backgroundColor: '#091b29',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#FFFFFF'
+                    }}>
+                      <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                    <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#111827', margin: '0 0 4px 0' }}>
+                      Personal Information
+                    </h3>
+                    <p style={{ fontSize: '13px', color: '#6B7280', margin: 0 }}>
+                      Let's start with your basic details
+                    </p>
+                  </div>
+
+                    <div style={{ display: 'grid', alignItems: 'center', margin: '10px 0 20px 0', gap: '12px' }}>
+                    <div style={{ flex: 1, height: '8px', backgroundColor: '#E5E7EB', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{ 
+                        height: '100%', 
+                        backgroundColor: '#091b29', 
+                        width: signUpSubStep === 1 ? '33.3%' : signUpSubStep === 2 ? '66.6%' : '100%',
+                        transition: 'width 0.3s ease'
+                      }} />
+                    </div>
+                    <span style={{ fontSize: '11px', color: '#6B7280', fontWeight: '600', minWidth: '32px', textAlign: 'right' }}>
+                      {signUpSubStep} of 3
+                    </span>
+                  </div>
+
+                  <form onSubmit={handleStep1Next} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '13px', color: '#6B7280', marginBottom: '8px', fontWeight: '500' }}>
+                        Username
+                      </label>
+                      <input 
+                        type="text" 
+                        placeholder="Enter your username" 
+                        required
+                        value={signUpUsername}
+                        onChange={(e) => setSignUpUsername(e.target.value)}
+                        style={{ 
+                          width: '100%', 
+                          padding: '14px 16px', 
+                          borderRadius: '12px', 
+                          border: '1px solid #E5E7EB', 
+                          backgroundColor: '#FFFFFF', 
+                          fontSize: '14px',
+                          color: '#111827',
+                          outline: 'none',
+                          boxSizing: 'border-box' 
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '13px', color: '#6B7280', marginBottom: '8px', fontWeight: '500' }}>
+                        Phone number
+                      </label>
+                      <input 
+                        type="tel" 
+                        placeholder="+234 801 234 5678" 
+                        required
+                        value={signUpPhone}
+                        onChange={handleSignUpPhoneChange}
+                        style={{ 
+                          width: '100%', 
+                          padding: '14px 16px', 
+                          borderRadius: '12px', 
+                          border: signUpPhoneError ? '1px solid #EF4444' : '1px solid #E5E7EB', 
+                          backgroundColor: '#FFFFFF', 
+                          fontSize: '14px',
+                          color: '#111827',
+                          outline: 'none',
+                          boxSizing: 'border-box' 
+                        }}
+                      />
+                      <span style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '6px', display: 'block' }}>
+                        Used to log in and receive OTP codes
+                      </span>
+                      {signUpPhoneError && (
+                        <span style={{ fontSize: '12px', color: '#EF4444', marginTop: '4px', display: 'block' }}>
+                          {signUpPhoneError}
+                        </span>
+                      )}
+                    </div>
+
+                    <button 
+                      type="submit"
+                      disabled={!isStep1Valid}
+                      style={{
+                        width: '100%',
+                        padding: '16px',
+                        borderRadius: '28px',
+                        backgroundColor: isStep1Valid ? '#091b29' : '#6C8395',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        fontWeight: '600',
+                        fontSize: '15px',
+                        cursor: isStep1Valid ? 'pointer' : 'not-allowed',
+                        marginTop: '24px',
+                        transition: 'background-color 0.25s ease'
+                      }}
+                    >
+                      Continue
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {/* ---------------- STEP 2 (2 of 3): Secure Your Account ---------------- */}
+              {signUpSubStep === 2 && (
+                <div>
+                  {/* Lock Icon */}
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+                    <div style={{
+                      width: '56px',
+                      height: '56px',
+                      borderRadius: '50%',
+                      backgroundColor: '#091b29',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#FFFFFF'
+                    }}>
+                      <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                    <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#111827', margin: '0 0 4px 0' }}>
+                      Secure Your Account
+                    </h3>
+                    <p style={{ fontSize: '13px', color: '#6B7280', margin: 0 }}>
+                      Create a strong password to protect your account
+                    </p>
+                  </div>
+
+                    <div style={{ display: 'grid', alignItems: 'center', margin: '16px 0 20px 0', gap: '12px' }}>
+                    <div style={{ flex: 1, height: '8px', backgroundColor: '#E5E7EB', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{ 
+                        height: '100%', 
+                        backgroundColor: '#091b29', 
+                        width: signUpSubStep === 2 ? '66.6%' : signUpSubStep === 2 ? '66.6%' : '100%',
+                        transition: 'width 0.3s ease'
+                      }} />
+                    </div>
+                    <span style={{ fontSize: '11px', color: '#6B7280', fontWeight: '600', minWidth: '32px', textAlign: 'right' }}>
+                      {signUpSubStep} of 3
+                    </span>
+                  </div>
+
+                  <form onSubmit={(e) => { e.preventDefault(); setSignUpSubStep(3); }} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '13px', color: '#6B7280', marginBottom: '8px', fontWeight: '500' }}>
+                        Password
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <input 
+                          type={showSignUpPassword ? 'text' : 'password'} 
+                          placeholder="••••••••••••" 
+                          required
+                          value={signUpPassword}
+                          onChange={(e) => setSignUpPassword(e.target.value)}
+                          style={{ 
+                            width: '100%', 
+                            padding: '14px 44px 14px 16px', 
+                            borderRadius: '12px', 
+                            border: '1px solid #E5E7EB', 
+                            backgroundColor: '#FFFFFF', 
+                            fontSize: '14px',
+                            color: '#111827',
+                            outline: 'none',
+                            boxSizing: 'border-box' 
+                          }}
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => setShowSignUpPassword(!showSignUpPassword)}
+                          style={{
+                            position: 'absolute',
+                            right: '14px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#9CA3AF',
+                            padding: 0,
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Password Requirements Card */}
+                    <div style={{
+                      backgroundColor: '#F3F4F6',
+                      borderRadius: '12px',
+                      padding: '6px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '5px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#374151' }}>ⓘ Password Requirements</span>
+                      </div>
+                      <div style={{ fontSize: '12px', color: hasMinLength ? '#10B981' : '#6B7280', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        • At least 8 characters
+                      </div>
+                      <div style={{ fontSize: '12px', color: hasUppercase ? '#10B981' : '#6B7280', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        • One Uppercase letter
+                      </div>
+                      <div style={{ fontSize: '12px', color: hasNumber ? '#10B981' : '#6B7280', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        • One number
+                      </div>
+                    </div>
+
+                    <button 
+                      type="submit"
+                      disabled={!isStep2Valid}
+                      style={{
+                        width: '100%',
+                        padding: '16px',
+                        borderRadius: '28px',
+                        backgroundColor: isStep2Valid ? '#091b29' : '#6C8395',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        fontWeight: '600',
+                        fontSize: '15px',
+                        cursor: isStep2Valid ? 'pointer' : 'not-allowed',
+                        marginTop: '16px',
+                        transition: 'background-color 0.25s ease'
+                      }}
+                    >
+                      Continue
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {/* ---------------- STEP 3 (3 of 3): Almost Done! ---------------- */}
+              {signUpSubStep === 3 && (
+                <div>
+                  {/* Check Icon */}
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+                    <div style={{
+                      width: '56px',
+                      height: '56px',
+                      borderRadius: '50%',
+                      backgroundColor: '#091b29',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#FFFFFF'
+                    }}>
+                      <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                    <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#111827', margin: '0 0 4px 0' }}>
+                      Almost Done!
+                    </h3>
+                    <p style={{ fontSize: '13px', color: '#6B7280', margin: 0 }}>
+                      Review and Confirm
+                    </p>
+                  </div>
+
+                    <div style={{ display: 'grid', alignItems: 'center', margin: '16px 0 20px 0', gap: '12px' }}>
+                    <div style={{ flex: 1, height: '8px', backgroundColor: '#E5E7EB', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{ 
+                        height: '100%', 
+                        backgroundColor: '#091b29', 
+                        width: signUpSubStep === 3 ? '100%' : signUpSubStep === 3 ? '100%' : '100%',
+                        transition: 'width 0.3s ease'
+                      }} />
+                    </div>
+                    <span style={{ fontSize: '11px', color: '#6B7280', fontWeight: '600', minWidth: '32px', textAlign: 'right' }}>
+                      {signUpSubStep} of 3
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+                    {/* Username Review */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1px solid #E5E7EB', borderRadius: '12px', backgroundColor: '#FAFAFA' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#091b29', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFF' }}>
+                          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '11px', color: '#6B7280' }}>Username</div>
+                          <div style={{ fontSize: '13px', fontWeight: '600', color: '#111827' }}>@{signUpUsername || 'username'}</div>
+                        </div>
+                      </div>
+                      <button onClick={() => setSignUpSubStep(1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280' }}>✎</button>
+                    </div>
+
+                    {/* Phone Review */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1px solid #E5E7EB', borderRadius: '12px', backgroundColor: '#FAFAFA' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#091b29', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFF' }}>
+                          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '11px', color: '#6B7280' }}>Phone number</div>
+                          <div style={{ fontSize: '13px', fontWeight: '600', color: '#111827' }}>{signUpPhone || '+234 801 234 5678'}</div>
+                        </div>
+                      </div>
+                      <button onClick={() => setSignUpSubStep(1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280' }}>✎</button>
+                    </div>
+
+                    {/* Password Review */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1px solid #E5E7EB', borderRadius: '12px', backgroundColor: '#FAFAFA' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#091b29', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFF' }}>
+                          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '11px', color: '#6B7280' }}>Password</div>
+                          <div style={{ fontSize: '13px', fontWeight: '600', color: '#111827' }}>••••••••</div>
+                        </div>
+                      </div>
+                      <button onClick={() => setSignUpSubStep(2)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280' }}>✎</button>
+                    </div>
+                  </div>
+
+                  {/* Terms & Conditions Checkbox */}
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '12px', color: '#6B7280', cursor: 'pointer', marginBottom: '24px' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={agreedToTerms} 
+                      onChange={(e) => setAgreedToTerms(e.target.checked)}
+                      style={{ marginTop: '2px', accentColor: '#091b29' }} 
+                    />
+                    <span>
+                      By creating an account, you agree to our <a href="#terms" style={{ color: '#091b29', textDecoration: 'underline' }}>Terms of service</a> and <a href="#privacy" style={{ color: '#091b29', textDecoration: 'underline' }}>privacy policy</a>
+                    </span>
+                  </label>
+
+                  <button 
+                    type="button"
+                    disabled={!agreedToTerms}
+                    onClick={() => setSignUpSubStep('otp')}
+                    style={{
+                      width: '100%',
+                      padding: '16px',
+                      borderRadius: '28px',
+                      backgroundColor: agreedToTerms ? '#091b29' : '#6C8395',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      fontWeight: '600',
+                      fontSize: '15px',
+                      cursor: agreedToTerms ? 'pointer' : 'not-allowed',
+                      transition: 'background-color 0.25s ease'
+                    }}
+                  >
+                    Create account
+                  </button>
+                </div>
+              )}
+
+              {/* ---------------- STEP 4 (3 of 3): OTP VERIFICATION ---------------- */}
+              {signUpSubStep === 'otp' && (
+                <div style={{ paddingTop: '12px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setSignUpSubStep(3)}
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      backgroundColor: '#F3F4F6',
+                      border: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: '#374151',
+                      marginBottom: '20px'
+                    }}
+                  >
+                    ‹
+                  </button>
+
+                  <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                    <h3 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: '0 0 8px 0' }}>
+                      Hello, {signUpUsername || 'User'}
+                    </h3>
+                    <p style={{ fontSize: '13px', color: '#6B7280', margin: 0, lineHeight: '1.4' }}>
+                      We sent you a verification code to<br />
+                      <span style={{ fontWeight: '600', color: '#374151' }}>{maskedPhone}</span>
+                    </p>
+                  </div>
+
+                  {/* 6 Digit Input Boxes */}
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '24px' }}>
+                    {otp.map((digit, idx) => (
+                      <input
+                        key={idx}
+                        id={`otp-input-${idx}`}
+                        type="text"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleOtpChange(idx, e.target.value)}
+                        style={{
+                          width: '44px',
+                          height: '52px',
+                          borderRadius: '12px',
+                          border: '1px solid #E5E7EB',
+                          backgroundColor: '#FFFFFF',
+                          textAlign: 'center',
+                          fontSize: '18px',
+                          fontWeight: '700',
+                          color: '#111827',
+                          outline: 'none'
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  <div style={{ textAlign: 'center', fontSize: '12px', color: '#6B7280', marginBottom: '32px' }}>
+                    OTP expires in <span style={{ fontWeight: '600', color: '#374151' }}>00:48</span>
+                  </div>
+
+                  <button 
+                    type="button"
+                    onClick={handleVerifyOtp}
+                    style={{
+                      width: '100%',
+                      padding: '16px',
+                      borderRadius: '28px',
+                      backgroundColor: otp.every(d => d !== '') ? '#091b29' : '#6C8395',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      fontWeight: '600',
+                      fontSize: '15px',
+                      cursor: 'pointer',
+                      marginBottom: '20px',
+                      transition: 'background-color 0.25s ease'
+                    }}
+                  >
+                    Verify Code
+                  </button>
+
+                  <p style={{ textAlign: 'center', fontSize: '13px', color: '#6B7280', margin: 0 }}>
+                    Didn't receive OTP?{' '}
+                    <span style={{ color: '#091b29', fontWeight: '700', cursor: 'pointer', textDecoration: 'underline' }}>
+                      Resend code
+                    </span>
+                  </p>
+                </div>
+              )}
             </div>
 
-            <form onSubmit={handleSignUpSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Full Name</label>
-                <input 
-                  type="text" 
-                  placeholder="Full name" 
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #E5E7EB', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Country</label>
-                <select 
-                  value={country} 
-                  onChange={(e) => setCountry(e.target.value)}
-                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #E5E7EB', backgroundColor: '#FFF', boxSizing: 'border-box' }}
+            {/* Footer Sign-In Switch */}
+            {signUpSubStep !== 'otp' && (
+              <p style={{ textAlign: 'center', fontSize: '13px', color: '#6B7280', margin: '20px 0 8px 0' }}>
+                Already have an account?{' '}
+                <span 
+                  onClick={() => setStep('signin')}
+                  style={{ color: '#091b29', fontWeight: '700', cursor: 'pointer' }}
                 >
-                  <option value="United States">United States</option>
-                  <option value="Nigeria">Nigeria</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Email Address</label>
-                <input 
-                  type="email" 
-                  placeholder="Email address" 
-                  required
-                  value={signUpEmail}
-                  onChange={(e) => setSignUpEmail(e.target.value)}
-                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #E5E7EB', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Referral Code (Optional)</label>
-                <input 
-                  type="text" 
-                  placeholder="Referral Code" 
-                  value={referralCode}
-                  onChange={(e) => setReferralCode(e.target.value)}
-                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #E5E7EB', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <button 
-                type="submit"
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  borderRadius: '12px',
-                  backgroundColor: '#003366',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  fontWeight: '600',
-                  fontSize: '16px',
-                  cursor: 'pointer',
-                  marginTop: '12px'
-                }}
-              >
-                Next
-              </button>
-            </form>
-
-            <p style={{ textAlign: 'center', fontSize: '14px', color: '#6B7280', marginTop: '24px' }}>
-              Already have an account?{' '}
-              <span 
-                onClick={() => setStep('signin')}
-                style={{ color: '#003366', fontWeight: '600', cursor: 'pointer' }}
-              >
-                Login
-              </span>
-            </p>
+                  Log in
+                </span>
+              </p>
+            )}
           </div>
         )}
 
