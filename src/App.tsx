@@ -959,8 +959,13 @@ export default function App() {
                     
                     <div style={{ display: 'grid', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
                       <span style={{ fontSize: '10px', color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+  <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: isManualLocation ? '#F59E0B' : '' }} />
+  <span style={{ fontSize: '10px', color: '#9CA3AF' }}>
+    {isManualLocation ? 'Set manually' : 'Captured automatically'}
+  </span>
+</div>
                         
-                        Captured automatically
                       </span>
                     </div>
                     </div>
