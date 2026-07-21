@@ -206,7 +206,7 @@ export default function App() {
       maxBounds: LAGOS_STRICT_BOUNDS
     });
     return () => { mapRef.current?.remove(); mapRef.current = null; };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, currentCoords]);
 
   useEffect(() => {
     if (!isAuthenticated || !mapRef.current) return;

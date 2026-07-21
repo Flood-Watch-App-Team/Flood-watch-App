@@ -1,5 +1,5 @@
 // import { Color } from 'maplibre-gl';
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 interface MapControlsProps {
   handleRecenterLocation: () => void;
