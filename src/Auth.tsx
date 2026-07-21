@@ -218,15 +218,7 @@ export default function Auth({ onAuthComplete }: AuthProps) {
           backgroundColor: step === 'splash' ? '#091b29' : '#FFFFFF',
           transition: 'all 0.3s ease'
         }}>
-          <span>9:41</span>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-            <svg width="16" height="10" viewBox="0 0 16 10" fill="currentColor">
-              <path d="M0 8h3V10H0V8zm4-3h3v5H4V5zm4-3h3v8H8V2zm4-2h3v10h-3V0z"/>
-            </svg>
-            <svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor">
-              <path d="M7.5 0C3.4 0 0 2.5 0 5.5c0 1.8 1.3 3.4 3.3 4.4L2.5 11l2.8-1.5c.7.2 1.4.3 2.2.3 4.1 0 7.5-2.5 7.5-5.5S11.6 0 7.5 0z"/>
-            </svg>
-          </div>
+          
         </div>
 
         {/* ----------------- 1. SPLASH SCREEN ----------------- */}
