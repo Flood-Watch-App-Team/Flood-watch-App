@@ -1,11 +1,14 @@
 import React from 'react';
 
+// import type { Dispatch, SetStateAction } from 'react';
+import type { TabType } from '../type'; // Adjust import path if needed
+
 interface TopHeaderProps {
   isReporting: boolean;
   reportingStage: 'form' | 'adjust';
   setIsReporting: (val: boolean) => void;
   setCapturedImages: React.Dispatch<React.SetStateAction<string[]>>;
-  setCurrentTab: (tab: unknown) => void;
+  setCurrentTab: (tab: TabType) => void;
   setReportingStage: (stage: 'form' | 'adjust') => void;
   handleMainSearchSubmit: (e: React.FormEvent) => void;
   displayedLocation: string;
@@ -26,8 +29,8 @@ export default function TopHeader({
   displayedLocation,
   mainSearchQuery,
   setMainSearchQuery,
-  currentUser,
-  getUserInitials
+//   currentUser,
+//   getUserInitials
 }: TopHeaderProps) {
   return (
     <div 

@@ -11,3 +11,4 @@ export interface FloodReport {
   timeActive: string;
   createdAt: number;
 }
+export type TabType = 'maps' | 'feed' | 'report' | 'alerts' | 'profile';

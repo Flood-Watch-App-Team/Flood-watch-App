@@ -1,10 +1,13 @@
 import React from 'react';
-
+import type { Dispatch, SetStateAction } from 'react';
+import type { TabType } from '../type'; // Adjust import path if needed
 
 interface BottomNavProps {
-  currentTab: string;
+//   currentTab: string;
+//   handleMapsTabClick: () => void;
+  currentTab: TabType;
   handleMapsTabClick: () => void;
-  setCurrentTab: (tab: unknown) => void;
+  setCurrentTab: Dispatch<SetStateAction<TabType>> | ((tab: TabType) => void);
   openReportingWorkflow: () => void;
   currentUser: string;
   getUserInitials: (name: string) => string;
