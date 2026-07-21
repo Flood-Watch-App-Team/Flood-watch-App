@@ -4,5 +4,9 @@ export interface FloodReport {
   coordinates: [number, number];
   imageUrl: string;
   waterLevel: 'Low' | 'Medium' | 'High';
-  status: 'Verified' | 'Unverified';
+  status: 'Unverified' | 'Verified';
+  confirmations: number;
+  photosCount: number;
+  timeActive: string;
+  createdAt: number;
 }
