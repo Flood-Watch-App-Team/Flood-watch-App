@@ -14,11 +14,30 @@ import feedIcon from "./assets/menu-03 copy.svg";
 import alertIcon from "./assets/notification-02.svg";
 
 const MAPTILER_KEY = 'kaeXCvS4tEksnniL7N1x';
-const LAGOS_STRICT_BOUNDS: [ [number, number], [number, number] ] = [
-  [2.7000, 6.2000], [4.3000, 6.7500]
-];
 
-const LAGOS_FLOOD_REPORTS: FloodReport[] = [
+// 1. Extend your MapTilerFeature interface to include place_type
+interface MapTilerFeature {
+  text?: string;
+  place_name?: string;
+  place_type?: string[]; // <--- Add this!
+  center?: [number, number];
+}
+
+interface MapTilerResponse {
+  features?: MapTilerFeature[];
+}
+
+// interface MapTilerFeature {
+//   text?: string;
+//   place_name?: string;
+//   center?: [number, number];
+// }
+
+// interface MapTilerResponse {
+//   features?: MapTilerFeature[];
+// }
+
+const INITIAL_FLOOD_REPORTS: FloodReport[] = [
   {
     id: 1,
     locationName: "Chevron Drive",
@@ -42,8 +61,9 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<string>('');
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const geolocateControlRef = useRef<maplibregl.GeolocateControl | null>(null);
   
-  const [reports, setReports] = useState<FloodReport[]>(LAGOS_FLOOD_REPORTS);
+  const [reports, setReports] = useState<FloodReport[]>(INITIAL_FLOOD_REPORTS);
   const [selectedReport, setSelectedReport] = useState<FloodReport | null>(null);
   const [isReporting, setIsReporting] = useState<boolean>(false);
   const [currentTab, setCurrentTab] = useState<TabType>('maps');
@@ -54,14 +74,18 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [mainSearchQuery, setMainSearchQuery] = useState('');
-  const [displayedLocation, setDisplayedLocation] = useState('Lagos, Nigeria');
+  const [displayedLocation, setDisplayedLocation] = useState('Locating...');
   const [searchQuery, setSearchQuery] = useState('');
   
-  const [newLocationName, setNewLocationName] = useState('Admiralty Way, Lekki Phase 1');
-  const [currentCoords, setCurrentCoords] = useState<[number, number] | null>([3.3792, 6.5244]);
+  const [newLocationName, setNewLocationName] = useState('Locating...');
+  const [currentCoords, setCurrentCoords] = useState<[number, number] | null>(null);
+  const currentCoordsRef = useRef<[number, number] | null>(null);
   const [isManualLocation, setIsManualLocation] = useState<boolean>(false);
   
-  // None active by default until clicked
+  useEffect(() => {
+    currentCoordsRef.current = currentCoords;
+  }, [currentCoords]);
+  
   const [newWaterLevel, setNewWaterLevel] = useState<'Low' | 'Medium' | 'High' | null>(null);
   const [description, setDescription] = useState('');
   
@@ -100,19 +124,39 @@ export default function App() {
     }
   };
 
-  const fetchLocationName = async (lng: number, lat: number) => {
-    try {
-      const response = await fetch(`https://api.maptiler.com/geocoding/${lng},${lat}.json?key=${MAPTILER_KEY}`);
-      const data = await response.json();
-      if (data.features && data.features.length > 0) return data.features[0].place_name;
-    } catch (error) {
-      console.error("Reverse geocoding error:", error);
+  // 2. Do NOT add explicit types (like f: any) inside the .find() callback
+const fetchLocationName = async (lng: number, lat: number): Promise<string> => {
+  try {
+    const response = await fetch(
+      `https://api.maptiler.com/geocoding/${lng},${lat}.json?key=${MAPTILER_KEY}&types=locality,place,neighborhood,sublocality,address`
+    );
+    const data = (await response.json()) as MapTilerResponse;
+
+    if (data.features && data.features.length > 0) {
+      // TypeScript automatically infers `f` as `MapTilerFeature` here—no `any` needed!
+      const localityMatch = data.features.find((f) => 
+        f.place_type?.includes('locality') || 
+        f.place_type?.includes('place') || 
+        f.place_type?.includes('neighborhood')
+      );
+
+      const targetFeature = localityMatch || data.features[0];
+      const rawName = targetFeature.text || targetFeature.place_name;
+
+      if (rawName) {
+        return rawName.split(',')[0].trim();
+      }
     }
-    return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-  };
+  } catch (error) {
+    console.error("Geocoding fetch error:", error);
+  }
+  return "Current Location";
+};
 
   const handleRecenterLocation = () => {
-    if (navigator.geolocation) {
+    if (geolocateControlRef.current) {
+      geolocateControlRef.current.trigger();
+    } else if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const { longitude, latitude } = position.coords;
@@ -139,8 +183,12 @@ export default function App() {
           setDisplayedLocation(placeName);
           setNewLocationName(placeName);
         },
-        () => {
-          setCurrentCoords([3.3792, 6.5244]);
+        async () => {
+          const fallbackCoords: [number, number] = [7.33, 5.29];
+          setCurrentCoords(fallbackCoords);
+          const placeName = await fetchLocationName(fallbackCoords[0], fallbackCoords[1]);
+          setDisplayedLocation(placeName);
+          setNewLocationName(placeName);
         },
         { enableHighAccuracy: true, timeout: 10000 }
       );
@@ -195,18 +243,51 @@ export default function App() {
     setCapturedImages(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
+  // Initial Map Setup
   useEffect(() => {
     if (!isAuthenticated || !mapContainerRef.current || mapRef.current) return;
-    mapRef.current = new maplibregl.Map({
+    
+    const initialCoords = currentCoordsRef.current || [7.33, 5.29];
+
+    const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_KEY}`,
-      center: currentCoords || [3.3792, 6.5244],
-      zoom: 11,
-      minZoom: 9.5,
-      maxBounds: LAGOS_STRICT_BOUNDS
+      center: initialCoords,
+      zoom: currentCoordsRef.current ? 14 : 12
     });
+
+    const geolocateControl = new maplibregl.GeolocateControl({
+      positionOptions: {
+        enableHighAccuracy: true
+      },
+      trackUserLocation: true,
+      showUserLocation: true,
+      showAccuracyCircle: true
+    });
+
+    geolocateControlRef.current = geolocateControl;
+    map.addControl(geolocateControl);
+
+    // Strongly typed callback replacing explicit `any`
+    geolocateControl.on('geolocate', async (position: unknown) => {
+      const posObj = position as GeolocationPosition;
+      if (posObj?.coords) {
+        const { longitude, latitude } = posObj.coords;
+        setCurrentCoords([longitude, latitude]);
+        const name = await fetchLocationName(longitude, latitude);
+        setDisplayedLocation(name);
+        setNewLocationName(name);
+      }
+    });
+
+    map.on('load', () => {
+      geolocateControl.trigger();
+    });
+
+    mapRef.current = map;
+
     return () => { mapRef.current?.remove(); mapRef.current = null; };
-  }, [isAuthenticated, currentCoords]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (!isAuthenticated || !mapRef.current) return;
@@ -274,7 +355,7 @@ export default function App() {
   const handleMapsTabClick = () => {
     setCurrentTab('maps');
     setIsReporting(false);
-    mapRef.current?.flyTo({ center: currentCoords || [3.3792, 6.5244], zoom: 14 });
+    mapRef.current?.flyTo({ center: currentCoords || [7.33, 5.29], zoom: 14 });
   };
 
   const handleMainSearchSubmit = async (e: React.FormEvent) => {
@@ -282,13 +363,16 @@ export default function App() {
     if (!mainSearchQuery.trim()) return;
     try {
       const response = await fetch(`https://api.maptiler.com/geocoding/${encodeURIComponent(mainSearchQuery)}.json?key=${MAPTILER_KEY}`);
-      const data = await response.json();
+      const data = (await response.json()) as MapTilerResponse;
       if (data.features && data.features.length > 0) {
         const feature = data.features[0];
-        setDisplayedLocation(feature.place_name);
-        setCurrentCoords(feature.center);
-        mapRef.current?.flyTo({ center: feature.center, zoom: 14 });
-        setMainSearchQuery('');
+        if (feature.center && feature.place_name) {
+          const placeName = (feature.text || feature.place_name).split(',')[0].trim();
+          setDisplayedLocation(placeName);
+          setCurrentCoords(feature.center);
+          mapRef.current?.flyTo({ center: feature.center, zoom: 14 });
+          setMainSearchQuery('');
+        }
       }
     } catch (err) { console.error(err); }
   };
@@ -298,12 +382,16 @@ export default function App() {
     if (!searchQuery.trim()) return;
     try {
       const response = await fetch(`https://api.maptiler.com/geocoding/${encodeURIComponent(searchQuery)}.json?key=${MAPTILER_KEY}`);
-      const data = await response.json();
+      const data = (await response.json()) as MapTilerResponse;
       if (data.features && data.features.length > 0) {
-        setNewLocationName(data.features[0].place_name);
-        setCurrentCoords(data.features[0].center);
-        setIsManualLocation(true);
-        mapRef.current?.flyTo({ center: data.features[0].center, zoom: 16.5 });
+        const feature = data.features[0];
+        if (feature.center && feature.place_name) {
+          const placeName = (feature.text || feature.place_name).split(',')[0].trim();
+          setNewLocationName(placeName);
+          setCurrentCoords(feature.center);
+          setIsManualLocation(true);
+          mapRef.current?.flyTo({ center: feature.center, zoom: 16.5 });
+        }
       }
     } catch (err) { console.error(err); }
   };
@@ -311,14 +399,19 @@ export default function App() {
   const selectQuickTag = async (tag: string) => {
     setSearchQuery(tag);
     setIsManualLocation(true);
-    setNewLocationName(`${tag}, Lekki Phase 1`);
-    const positions: Record<string, [number, number]> = {
-      'Admiralty Way': [3.4841, 6.4281], 'Chevron Drive': [3.5358, 6.4430], 'Freedom Way': [3.4920, 6.4350]
-    };
-    if (positions[tag]) {
-      setCurrentCoords(positions[tag]);
-      mapRef.current?.flyTo({ center: positions[tag], zoom: 16.5 });
-    }
+    try {
+      const response = await fetch(`https://api.maptiler.com/geocoding/${encodeURIComponent(tag)}.json?key=${MAPTILER_KEY}`);
+      const data = (await response.json()) as MapTilerResponse;
+      if (data.features && data.features.length > 0) {
+        const feature = data.features[0];
+        if (feature.center && feature.place_name) {
+          const placeName = (feature.text || feature.place_name).split(',')[0].trim();
+          setNewLocationName(placeName);
+          setCurrentCoords(feature.center);
+          mapRef.current?.flyTo({ center: feature.center, zoom: 16.5 });
+        }
+      }
+    } catch (err) { console.error(err); }
   };
 
   const handleReportSubmit = async (e: React.FormEvent) => {
@@ -329,7 +422,7 @@ export default function App() {
       return;
     }
     setIsSubmitting(true);
-    const targetCoordinates: [number, number] = currentCoords || [3.3792, 6.5244];
+    const targetCoordinates: [number, number] = currentCoords || [0, 0];
     const imageList = capturedImages.length > 0 ? capturedImages : ["https://images.unsplash.com/photo-1547683905-f686c993aae5?q=80&w=400"];
 
     const newReport: FloodReport = {
@@ -591,7 +684,7 @@ export default function App() {
                     {selectedReport.locationName}
                   </h3>
                   <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#6B7280' }}>
-                    Lekki Phase 1 • reported {selectedReport.timeActive} ago
+                    reported {selectedReport.timeActive} ago
                   </p>
                 </div>
 
@@ -783,7 +876,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Report Floods Modal matching Figma */}
+        {/* Report Floods Modal */}
         {isReporting && (
           <>
             {reportingStage === 'form' && (
@@ -804,7 +897,6 @@ export default function App() {
                   fontFamily: 'sans-serif'
                 }}
               >
-                {/* Modal Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                   <div>
                     <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#111827' }}>Report flooding</h2>
@@ -820,7 +912,6 @@ export default function App() {
                 </div>
 
                 <form onSubmit={handleReportSubmit}>
-                  {/* Photos Section */}
                   <div style={{ marginBottom: '16px' }}>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
                       Photos ({capturedImages.length}/2)
@@ -850,13 +941,11 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Severity Selector with color coding & default inactive state */}
                   <div style={{ marginBottom: '16px' }}>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
                       How bad is it?
                     </label>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      {/* LOW */}
                       <button
                         type="button"
                         onClick={() => setNewWaterLevel('Low')}
@@ -881,7 +970,6 @@ export default function App() {
                         Low
                       </button>
 
-                      {/* MEDIUM */}
                       <button
                         type="button"
                         onClick={() => setNewWaterLevel('Medium')}
@@ -902,11 +990,10 @@ export default function App() {
                           color: newWaterLevel === 'Medium' ? '#FFFFFF' : '#4B5563'
                         }}
                       >
-                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: newWaterLevel === 'Medium' ? '#F97316' : '#F97316' }} />
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#F97316' }} />
                         Medium
                       </button>
 
-                      {/* HIGH */}
                       <button
                         type="button"
                         onClick={() => setNewWaterLevel('High')}
@@ -933,7 +1020,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Description Box */}
                   <div style={{ marginBottom: '16px' }}>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>
                       Description <span style={{ fontWeight: '400', color: '#9CA3AF' }}>(optional)</span>
@@ -947,40 +1033,36 @@ export default function App() {
                     />
                   </div>
 
-                  {/* Location Card */}
-                   <div style={{ fontSize: '11px', color: '#000104', marginBottom: '2px', fontWeight: '600' }}>Location</div>
+                  <div style={{ fontSize: '11px', color: '#000104', marginBottom: '2px', fontWeight: '600' }}>Location</div>
 
                   <div style={{ marginBottom: '5px', padding: '10px 12px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '20px' }}>
-                        <img src="/src/assets/location-06.svg" alt="" width={24} height={24} />
+                    <img src="/src/assets/location-06.svg" alt="" width={24} height={24} />
                     <div>
                       <div style={{ fontSize: '13px', fontWeight: '600', color: '#111827' }}>
-                      {newLocationName}
+                        {newLocationName}
+                      </div>
+                      
+                      <div style={{ display: 'grid', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                        <span style={{ fontSize: '10px', color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: isManualLocation ? '#F59E0B' : '' }} />
+                            <span style={{ fontSize: '10px', color: '#9CA3AF' }}>
+                              {isManualLocation ? 'Set manually' : 'Captured automatically'}
+                            </span>
+                          </div>
+                        </span>
+                      </div>
                     </div>
-                    
-                    <div style={{ display: 'grid', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
-                      <span style={{ fontSize: '10px', color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-  <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: isManualLocation ? '#F59E0B' : '' }} />
-  <span style={{ fontSize: '10px', color: '#9CA3AF' }}>
-    {isManualLocation ? 'Set manually' : 'Captured automatically'}
-  </span>
-</div>
-                        
-                      </span>
-                    </div>
-                    </div>
-
                   </div>
                   
                   <button 
-                        type="button" 
-                        onClick={() => { setReportingStage('adjust'); if (mapRef.current && currentCoords) mapRef.current.flyTo({ center: currentCoords, zoom: 16.5 }); }}
-                        style={{ border: 'none', background: 'none', color: '#070000', fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: 0 }}
-                      >
-                        Not your location? Adjust
-                    </button>
+                    type="button" 
+                    onClick={() => { setReportingStage('adjust'); if (mapRef.current && currentCoords) mapRef.current.flyTo({ center: currentCoords, zoom: 16.5 }); }}
+                    style={{ border: 'none', background: 'none', color: '#070000', fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: 0 }}
+                  >
+                    Not your location? Adjust
+                  </button>
 
-                  {/* Submit Button */}
                   <button 
                     style={{ width: '100%', padding: '12px', borderRadius: '50px', backgroundColor: '#003366', color: '#FFFFFF', border: 'none', fontSize: '14px', fontWeight: '300', cursor: 'pointer', marginTop: '20px' }}
                   >
@@ -998,7 +1080,7 @@ export default function App() {
                     <input type="text" placeholder="Search a street or area" value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setNewLocationName(e.target.value); setIsManualLocation(true); }} style={{ width: '100%', padding: '12px' }} />
                   </form>
                   <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '12px 0' }}>
-                    {['Admiralty Way', 'Chevron Drive', 'Freedom Way'].map((tag) => <button key={tag} type="button" onClick={() => selectQuickTag(tag)}>{tag}</button>)}
+                    {['Afororu', 'Ahiazu Mbaise', 'Owerri'].map((tag) => <button key={tag} type="button" onClick={() => selectQuickTag(tag)}>{tag}</button>)}
                   </div>
                   <button type="button" className="submit-btn" onClick={() => { if (mapRef.current) setCurrentCoords([mapRef.current.getCenter().lng, mapRef.current.getCenter().lat]); setReportingStage('form'); }} style={{ width: '100%', backgroundColor: '#003366', color: '#fff' }}>Continue</button>
                 </div>
